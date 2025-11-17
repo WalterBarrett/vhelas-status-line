@@ -1,6 +1,6 @@
-# SillyTavern Extension Example
+# Vhelas Status Line
 
-*Provide a brief description of how your extension works, what problem it aims to solve.*
+Adds support for Vehlas and the Status Line to SillyTavern.
 
 ## Features
 
@@ -18,7 +18,8 @@
 
 ## Prerequisites
 
-*Specify the version of ST necessary here.*
+- SillyTavern **(TODO: *current version*)**
+- Vhelas
 
 ## Support and Contributions
 

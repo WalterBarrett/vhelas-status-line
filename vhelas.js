@@ -1,0 +1,231 @@
+// The main script for the extension
+// The following are examples of some basic extension functionality
+
+//You'll likely need to import extension_settings, getContext, and loadExtensionSettings from extensions.js
+import { extension_settings, getContext, loadExtensionSettings } from "../../../extensions.js";
+
+//You'll likely need to import some other functions from the main script
+import { saveSettingsDebounced } from "../../../../script.js";
+
+// Keep track of where your extension is located, name should match repo name
+const extensionName = "vhelas-status-line";
+const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
+const extensionSettings = extension_settings[extensionName];
+const defaultSettings = {};
+
+
+
+// Loads the extension settings if they exist, otherwise initializes them to the defaults.
+async function loadSettings() {
+    //Create the settings if they don't exist
+    extension_settings[extensionName] = extension_settings[extensionName] || {};
+    if (Object.keys(extension_settings[extensionName]).length === 0) {
+        Object.assign(extension_settings[extensionName], defaultSettings);
+    }
+
+    // Updating settings in the UI
+    //$("#example_setting").prop("checked", extension_settings[extensionName].example_setting).trigger("input");
+}
+
+// This function is called when the extension settings are changed in the UI
+function onExampleInput(event) {
+    const value = Boolean($(event.target).prop("checked"));
+    extension_settings[extensionName].example_setting = value;
+    saveSettingsDebounced();
+}
+
+/*
+// This function is called when the button is clicked
+function onButtonClick() {
+    // You can do whatever you want here
+    // Let's make a popup appear with the checked setting
+    toastr.info(
+        `The checkbox is ${extension_settings[extensionName].example_setting ? "checked" : "not checked"}`,
+        "A popup appeared because you clicked the button!"
+    );
+}
+*/
+
+function getTextForValue(value) {
+    if (value === null) {
+        return "";
+    }
+    return String(value);
+}
+
+function updateStatusBar() {
+    const context = getContext();
+    const messages = context.chat;
+
+    const regex = /<!--STATUS:([\s\S]*?)-->/g;
+
+    let left = "";
+    let center = ""; // getCharacterName() || "SillyTavern";
+    let right = "";
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (!msg.mes.includes("<!--STATUS:")) {
+            continue;
+        }
+        const matches = [...msg.mes.matchAll(regex)];
+        let success = false;
+
+        for (let j = matches.length - 1; j >= 0; j--) {
+            const match = matches[j];
+            const inner = match[1];
+            try {
+                const parsed = JSON.parse(inner);
+                if (!Array.isArray(parsed) || !(parsed.every(el => typeof el === "string" || typeof el === "number" || el === null))) {
+                    console.error("[Vhelas] Expected JSON array in STATUS marker:", inner);
+                    continue;
+                }
+                if (parsed.length > 3) {
+                    console.error("[Vhelas] JSON array in STATUS marker too long:", inner);
+                    continue;
+                } else if (parsed.length < 1) { // In case JavaScript invents negatively-sized arrays.
+                    console.error("[Vhelas] JSON array in STATUS marker too short:", inner);
+                    continue;
+                } else if (parsed.length == 3) {
+                    left = getTextForValue(parsed[0]);
+                    center = getTextForValue(parsed[1]);
+                    right = getTextForValue(parsed[2]);
+                } else if (parsed.length == 2) {
+                    left = getTextForValue(parsed[0]);
+                    center = getTextForValue("");
+                    right = getTextForValue(parsed[1]);
+                } else if (parsed.length == 1) {
+                    left = getTextForValue("");
+                    center = getTextForValue(parsed[0]);
+                    right = getTextForValue("");
+                }
+                success = true;
+                break;
+            } catch (err) {
+                console.error("[Vhelas] Invalid JSON in STATUS marker:", inner);
+            }
+        }
+        if (success) {
+            break;
+        }
+    }
+
+    $("#vhelas-top-left").text(left);
+    $("#vhelas-top-center").text(center);
+    $("#vhelas-top-right").text(right);
+
+    let left_set   = left.length > 0;
+    let center_set = center.length > 0;
+    let right_set  = right.length > 0;
+
+    if (left_set && !center_set && right_set) {
+        $("#vhelas-top-left, #vhelas-top-right").css("display", "block");
+        $("#vhelas-top-center").css("display", "none");
+    } else if (!left_set && center_set && !right_set) {
+        $("#vhelas-top-left, #vhelas-top-right").css("display", "none");
+        $("#vhelas-top-center").css("display", "block");
+    } else {
+        $("#vhelas-top-left, #vhelas-top-center, #vhelas-top-right").css("display", "block");
+    }
+    updateStatusBarMetrics();
+}
+
+function updateStatusBarMetrics() {
+    let left_set   = $("#vhelas-top-left").text().length > 0;
+    let center_set = $("#vhelas-top-center").text().length > 0;
+    let right_set  = $("#vhelas-top-right").text().length > 0;
+
+    let maxHeight = 0;
+    if (!left_set && !center_set && !right_set) {
+        $("#vhelas-status-line").css("display", "none");
+    } else {
+        $("#vhelas-status-line").css("display", "flex");
+        $('#vhelas-status-line').children().each(function() {
+            let h = $(this).outerHeight(); // includes padding + border
+            if (h > maxHeight) {
+                maxHeight = h;
+            }
+        });
+    }
+
+    document.documentElement.style.setProperty('--statusBarHeight', maxHeight + 'px');
+}
+
+/*
+function testLoop() {
+    updateStatusBar();
+
+    // schedule the next frame
+    requestAnimationFrame(testLoop);
+}
+*/
+
+function getCharacterName() {
+    const context = getContext();
+    const character = context?.characters[context.characterId];
+    const charName = character?.name || null;
+    return charName;
+}
+
+function onCharacterUpdate() {
+    updateStatusBar();
+}
+
+function onMostRecentMessageUpdate() {
+    // Theoretically, we couold quickly update the status bar based off just this single message, if applicable.
+    // For now, we'll just hope this is fast enough:
+    onNthMessageUpdate();
+}
+
+function onNthMessageUpdate() {
+    console.log('[Vhelas] onNthMessageUpdate');
+    updateStatusBar();
+}
+
+// This function is called when the extension is loaded
+jQuery(async () => {
+    const context = getContext();
+    console.log("[Vhelas] Extension initializing.");
+    context.eventSource.on(context.eventTypes.CHARACTER_PAGE_LOADED, onCharacterUpdate);
+    context.eventSource.on(context.eventTypes.CHARACTER_RENAMED, onCharacterUpdate);
+    context.eventSource.on(context.eventTypes.CHAT_CHANGED, onCharacterUpdate);
+
+    context.eventSource.on(context.eventTypes.CHARACTER_PAGE_LOADED, onNthMessageUpdate);
+    context.eventSource.on(context.eventTypes.CHAT_CHANGED, onNthMessageUpdate);
+    context.eventSource.on(context.eventTypes.MESSAGE_SWIPED, onMostRecentMessageUpdate); // Swipes can only be the most recent assistant message in SillyTavern.
+    context.eventSource.on(context.eventTypes.MESSAGE_SENT, onMostRecentMessageUpdate);
+    context.eventSource.on(context.eventTypes.MESSAGE_RECEIVED, onMostRecentMessageUpdate);
+    context.eventSource.on(context.eventTypes.MESSAGE_EDITED, onNthMessageUpdate);
+    context.eventSource.on(context.eventTypes.MESSAGE_DELETED, onNthMessageUpdate);
+    context.eventSource.on(context.eventTypes.MESSAGE_UPDATED, onNthMessageUpdate);
+    context.eventSource.on(context.eventTypes.MESSAGE_FILE_EMBEDDED, onNthMessageUpdate);
+    //context.eventSource.on(context.eventTypes.MESSAGE_REASONING_EDITED, onNthMessageUpdate);
+    //context.eventSource.on(context.eventTypes.MESSAGE_REASONING_DELETED, onNthMessageUpdate);
+    context.eventSource.on(context.eventTypes.MESSAGE_SWIPE_DELETED, onNthMessageUpdate);
+
+    // This is an example of loading HTML from a file
+    const settingsHtml = await $.get(`${extensionFolderPath}/settings.html`);
+    const statuslineHtml = await $.get(`${extensionFolderPath}/statusline.html`);
+
+    // Append settingsHtml to extensions_settings
+    // extension_settings and extensions_settings2 are the left and right columns of the settings menu
+    // Left should be extensions that deal with system functions and right should be visual/UI related
+    $("#extensions_settings2").append(settingsHtml);
+
+    $("#top-settings-holder").after(statuslineHtml);
+
+    /*
+    // These are examples of listening for events
+    $("#my_button").on("click", onButtonClick);
+    $("#example_setting").on("input", onExampleInput);
+    */
+
+    // Load settings when starting things up (if you have any)
+    loadSettings();
+
+    updateStatusBar();
+
+    window.addEventListener('resize', updateStatusBarMetrics);
+
+    /*requestAnimationFrame(testLoop);*/
+});

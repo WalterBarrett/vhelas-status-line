@@ -1,1 +1,58 @@
 /* All style elements for your extension go here */
+:root {
+    --statusBarHeight: 22px;
+}
+
+#chat {
+    padding-top: var(--statusBarHeight);
+}
+
+#vhelas-status-line {
+    top: var(--topBarBlockSize);
+
+    width: var(--sheldWidth);
+    margin: 0 auto;
+    left: 0;
+    right: 0;
+    display: inline-block;
+    height: var(--statusBarHeight);
+    position: absolute;
+    z-index: 2999;
+
+    background-color: var(--SmartThemeBlurTintColor);
+    background-image: linear-gradient(var(--SmartThemeBorderColor), var(--SmartThemeBorderColor));
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.vhelas-status-segment {
+    flex: 1;
+}
+
+#vhelas-top-left {
+    align-self: center;
+    text-align: left;
+    padding-left: 10px;
+}
+
+#vhelas-top-center {
+    align-self: center;
+    text-align: center;
+    margin: auto;
+}
+
+#vhelas-top-right {
+    align-self: center;
+    text-align: right;
+    padding-right: 10px;
+}
+
+@media screen and (max-width: 1000px) {
+  #vhelas-status-line {
+    position: fixed;
+    width: 100vw;
+    width: 100dvw;
+  }
+}
