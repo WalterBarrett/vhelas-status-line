@@ -5,7 +5,7 @@
 import { extension_settings, getContext, loadExtensionSettings } from "../../../extensions.js";
 
 //You'll likely need to import some other functions from the main script
-import { saveSettingsDebounced } from "../../../../script.js";
+import { saveSettingsDebounced, saveChatConditional } from "../../../../script.js";
 
 // Keep track of where your extension is located, name should match repo name
 const extensionName = "vhelas-status-line";
@@ -57,57 +57,43 @@ function updateStatusBar() {
     const context = getContext();
     const messages = context.chat;
 
-    const regex = /<!--STATUS:([\s\S]*?)-->/g;
-
     let left = "";
     let center = ""; // getCharacterName() || "SillyTavern";
     let right = "";
 
     for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i];
-        if (!msg.mes.includes("<!--STATUS:")) {
+        const swipe_id = msg.swipe_id || 0;
+        if (!("vhelas_status" in msg.variables[swipe_id])) {
+            console.log("[Vhelas] !(\"vhelas_status\" in:", msg.variables[swipe_id])
             continue;
         }
-        const matches = [...msg.mes.matchAll(regex)];
-        let success = false;
 
-        for (let j = matches.length - 1; j >= 0; j--) {
-            const match = matches[j];
-            const inner = match[1];
-            try {
-                const parsed = JSON.parse(inner);
-                if (!Array.isArray(parsed) || !(parsed.every(el => typeof el === "string" || typeof el === "number" || el === null))) {
-                    console.error("[Vhelas] Expected JSON array in STATUS marker:", inner);
-                    continue;
-                }
-                if (parsed.length > 3) {
-                    console.error("[Vhelas] JSON array in STATUS marker too long:", inner);
-                    continue;
-                } else if (parsed.length < 1) { // In case JavaScript invents negatively-sized arrays.
-                    console.error("[Vhelas] JSON array in STATUS marker too short:", inner);
-                    continue;
-                } else if (parsed.length == 3) {
-                    left = getTextForValue(parsed[0]);
-                    center = getTextForValue(parsed[1]);
-                    right = getTextForValue(parsed[2]);
-                } else if (parsed.length == 2) {
-                    left = getTextForValue(parsed[0]);
-                    center = getTextForValue("");
-                    right = getTextForValue(parsed[1]);
-                } else if (parsed.length == 1) {
-                    left = getTextForValue("");
-                    center = getTextForValue(parsed[0]);
-                    right = getTextForValue("");
-                }
-                success = true;
-                break;
-            } catch (err) {
-                console.error("[Vhelas] Invalid JSON in STATUS marker:", inner);
-            }
+        const status_array = msg.variables[swipe_id].vhelas_status;
+        if (!Array.isArray(status_array) || !(status_array.every(el => typeof el === "string" || typeof el === "number" || el === null))) {
+            console.error("[Vhelas] Expected JSON array for STATUS update:", status_array);
+            continue;
         }
-        if (success) {
-            break;
+        if (status_array.length > 3) {
+            console.error("[Vhelas] JSON array for STATUS update too long:", status_array);
+            continue;
+        } else if (status_array.length < 1) { // In case JavaScript invents negatively-sized arrays.
+            console.error("[Vhelas] JSON array for STATUS update too short:", status_array);
+            continue;
+        } else if (status_array.length == 3) {
+            left = getTextForValue(status_array[0]);
+            center = getTextForValue(status_array[1]);
+            right = getTextForValue(status_array[2]);
+        } else if (status_array.length == 2) {
+            left = getTextForValue(status_array[0]);
+            center = getTextForValue("");
+            right = getTextForValue(status_array[1]);
+        } else if (status_array.length == 1) {
+            left = getTextForValue("");
+            center = getTextForValue(status_array[0]);
+            right = getTextForValue("");
         }
+        break;
     }
 
     $("#vhelas-top-left").text(left);
@@ -151,15 +137,6 @@ function updateStatusBarMetrics() {
     document.documentElement.style.setProperty('--statusBarHeight', maxHeight + 'px');
 }
 
-/*
-function testLoop() {
-    updateStatusBar();
-
-    // schedule the next frame
-    requestAnimationFrame(testLoop);
-}
-*/
-
 function getCharacterName() {
     const context = getContext();
     const character = context?.characters[context.characterId];
@@ -168,6 +145,7 @@ function getCharacterName() {
 }
 
 function onCharacterUpdate() {
+    parseAllMessagesForVhelasTags();
     updateStatusBar();
 }
 
@@ -180,6 +158,89 @@ function onMostRecentMessageUpdate() {
 function onNthMessageUpdate() {
     console.log('[Vhelas] onNthMessageUpdate');
     updateStatusBar();
+}
+
+function parseSingleMessageForVhelasTags(msg_text) {
+    let results = {};
+
+    const tagHandlers = {
+        STATUS: {
+            validate: (parsed) =>
+                Array.isArray(parsed) &&
+                parsed.length >= 1 &&
+                parsed.length <= 3 &&
+                parsed.every(el => typeof el === "string" || typeof el === "number" || el === null),
+            assign: (parsed) => ({ vhelas_status: parsed })
+        },
+        SAVE: {
+            validate: (parsed) => typeof parsed === "string",
+            assign: (parsed) => ({ vhelas_save: parsed })
+        }
+    };
+
+    for (const [tagName, { validate, assign }] of Object.entries(tagHandlers)) {
+        const marker = `<!--${tagName}:`;
+        if (msg_text.includes(marker)) {
+            const regex = new RegExp(`<!--${tagName}:([\\s\\S]*?)-->`, "g");
+            const matches = [...msg_text.matchAll(regex)];
+            for (let j = matches.length - 1; j >= 0; j--) {
+                const inner = matches[j][1];
+                try {
+                    const parsed = JSON.parse(inner);
+                    if (!validate(parsed)) {
+                        console.error(`[Vhelas] Validation failed for ${tagName} marker:`, inner);
+                        continue;
+                    }
+                    Object.assign(results, assign(parsed));
+                    results.mes = msg_text = msg_text.replace(regex, "").trim();
+                    break;
+                } catch (err) {
+                    console.error(`[Vhelas] Invalid JSON in ${tagName} marker:`, inner);
+                }
+            }
+        }
+    }
+
+    return results;
+}
+
+function parseAllMessagesForVhelasTags() {
+    const context = getContext();
+    let anythingModified = false;
+    console.log(`[Vhelas] context.chat:`, context.chat);
+    for (let i = 0; i < context.chat.length; i++) {
+        const msg = context.chat[i];
+        if ("swipes" in msg) {
+            for (let j = 0; j < msg.swipes.length; j++) {
+                let results = parseSingleMessageForVhelasTags(msg.swipes[j])
+                if ("vhelas_status" in results) {
+                    msg.variables[j].vhelas_status = results.vhelas_status;
+                    anythingModified = true;
+                }
+                if ("mes" in results) {
+                    msg.swipes[j] = results["mes"];
+                    if (j == msg.swipe_id) {
+                        msg.mes = msg.swipes[j];
+                    }
+                    anythingModified = true;
+                }
+            }
+        } else {
+            let results = parseSingleMessageForVhelasTags(msg.mes)
+            if ("vhelas_status" in results) {
+                msg.variables[0].vhelas_status = results.vhelas_status;
+                anythingModified = true;
+            }
+            if ("mes" in results) {
+                msg.mes = results["mes"]
+                anythingModified = true;
+            }
+        }
+    }
+
+    if (anythingModified) {
+        saveChatConditional();
+    }
 }
 
 // This function is called when the extension is loaded
@@ -226,6 +287,4 @@ jQuery(async () => {
     updateStatusBar();
 
     window.addEventListener('resize', updateStatusBarMetrics);
-
-    /*requestAnimationFrame(testLoop);*/
 });
