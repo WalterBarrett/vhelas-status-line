@@ -321,3 +321,19 @@ jQuery(async () => {
 
     window.addEventListener('resize', updateStatusBarMetrics);
 });
+
+/* We're at load order 3008, so we'll (hopefully) load after anything that cares about contextSize,
+   since the save file would bloat the token size infinitely, if it was actually sent to a real LLM
+   instead of our IF interpreter. */
+globalThis.vhelasInterceptor = async function(chat, contextSize, abort, type) {
+    let save_data = getSaveData();
+    if (save_data) {
+        const systemNote = {
+            is_user: false,
+            name: "Vhelas",
+            send_date: Date.now(),
+            mes: `<!--SAVE:"${save_data}"-->`
+        };
+        chat.unshift(systemNote);
+    }
+}

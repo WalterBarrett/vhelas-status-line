@@ -1,6 +1,7 @@
 {
     "display_name": "Vhelas Status Line",
-    "loading_order": 9,
+    "loading_order": 3008,
+    "generate_interceptor": "vhelasInterceptor",
     "requires": [],
     "optional": [],
     "js": "vhelas.js",
