@@ -157,6 +157,7 @@ function onMostRecentMessageUpdate() {
 
 function onNthMessageUpdate() {
     console.log('[Vhelas] onNthMessageUpdate');
+    parseAllMessagesForVhelasTags();
     updateStatusBar();
 }
 
@@ -263,6 +264,7 @@ jQuery(async () => {
     //context.eventSource.on(context.eventTypes.MESSAGE_REASONING_EDITED, onNthMessageUpdate);
     //context.eventSource.on(context.eventTypes.MESSAGE_REASONING_DELETED, onNthMessageUpdate);
     context.eventSource.on(context.eventTypes.MESSAGE_SWIPE_DELETED, onNthMessageUpdate);
+    context.eventSource.on(context.eventTypes.CHARACTER_FIRST_MESSAGE_SELECTED, onMostRecentMessageUpdate);
 
     // This is an example of loading HTML from a file
     const settingsHtml = await $.get(`${extensionFolderPath}/settings.html`);
