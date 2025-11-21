@@ -53,6 +53,36 @@ function getTextForValue(value) {
     return String(value);
 }
 
+function hasKeys(obj) {
+    for (const _ in obj) {
+        return true;
+    }
+    return false;
+}
+
+function getSaveData() {
+    const context = getContext();
+    const messages = context.chat;
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        const swipe_id = msg.swipe_id || 0;
+        console.log(`[Vhelas] msg, msg.variables[${swipe_id}]:`, msg, msg.variables[swipe_id])
+        if (!("vhelas_save" in msg.variables[swipe_id])) {
+            continue;
+        }
+
+        const save_string = msg.variables[swipe_id].vhelas_save;
+        if (!(typeof save_string === "string" || save_string === null)) {
+            console.error("[Vhelas] Expected JSON string for SAVE update:", save_string);
+            continue;
+        }
+		return save_string;
+    }
+
+    return null;
+}
+
 function updateStatusBar() {
     const context = getContext();
     const messages = context.chat;
@@ -65,7 +95,6 @@ function updateStatusBar() {
         const msg = messages[i];
         const swipe_id = msg.swipe_id || 0;
         if (!("vhelas_status" in msg.variables[swipe_id])) {
-            console.log("[Vhelas] !(\"vhelas_status\" in:", msg.variables[swipe_id])
             continue;
         }
 
@@ -214,26 +243,28 @@ function parseAllMessagesForVhelasTags() {
         if ("swipes" in msg) {
             for (let j = 0; j < msg.swipes.length; j++) {
                 let results = parseSingleMessageForVhelasTags(msg.swipes[j])
-                if ("vhelas_status" in results) {
-                    msg.variables[j].vhelas_status = results.vhelas_status;
-                    anythingModified = true;
-                }
                 if ("mes" in results) {
                     msg.swipes[j] = results["mes"];
                     if (j == msg.swipe_id) {
                         msg.mes = msg.swipes[j];
                     }
+                    delete results.mes;
+                    anythingModified = true;
+                }
+                if (hasKeys(results)) {
+                    Object.assign(msg.variables[j], results);
                     anythingModified = true;
                 }
             }
         } else {
             let results = parseSingleMessageForVhelasTags(msg.mes)
-            if ("vhelas_status" in results) {
-                msg.variables[0].vhelas_status = results.vhelas_status;
+            if ("mes" in results) {
+                msg.mes = results["mes"];
+                delete results.mes;
                 anythingModified = true;
             }
-            if ("mes" in results) {
-                msg.mes = results["mes"]
+            if (hasKeys(results)) {
+                Object.assign(msg.variables[0], results);
                 anythingModified = true;
             }
         }
