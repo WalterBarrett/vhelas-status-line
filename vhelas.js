@@ -75,6 +75,10 @@ function hasKeys(obj) {
     return false;
 }
 
+function getVariableFromMessage(msg, variable) {
+    return msg.variables[msg.swipe_id]?.[`vhelas_${variable}`] ?? undefined;
+}
+
 function getSaveData() {
     const context = getContext();
     const messages = context.chat;
@@ -219,6 +223,13 @@ function parseSingleMessageForVhelasTags(msg_text) {
         SAVE: {
             validate: (parsed) => typeof parsed === "string",
             assign: (parsed) => ({ vhelas_save: parsed })
+        },
+        INPUT: {
+            validate: (parsed) =>
+                (typeof parsed === "string") ||
+                (Array.isArray(parsed) && parsed.every(el => typeof el === "string" || typeof el === "number" || el === null)
+            ),
+            assign: (parsed) => ({ vhelas_input: parsed })
         }
     };
 
@@ -352,7 +363,8 @@ globalThis.vhelasInterceptor = async function(chat, contextSize, abort, type) {
                     "hash": hash,
                     "save_data": save_data
                 }
-                console.log(`[Vhelas] Sending save data to ${endpoint}:`, sent_data);
+                //console.log(`[Vhelas] Sending save data to ${endpoint}:`, sent_data);
+                console.log(`[Vhelas] Sending save data to ${endpoint}.`);
 
                 await fetch(endpoint, {
                     method: "POST",
@@ -364,13 +376,22 @@ globalThis.vhelasInterceptor = async function(chat, contextSize, abort, type) {
             } catch (err) {
                 console.error("[Vhelas] Failed to POST save data:", err);
             }
-            const systemNote = {
+            const new_chat = [{
                 is_user: false,
                 name: "Vhelas",
                 send_date: Date.now(),
-                mes: `<!--SAVE:"${hash}"-->`
-            };
-            chat.unshift(systemNote);
+                mes: `<!--SAVE:${JSON.stringify(hash)}-->`
+            }]
+            for (const msg of chat) {
+                const cloned = structuredClone(msg);
+                const var_input = getVariableFromMessage(msg, "input");
+                if (var_input !== undefined) {
+                    cloned.mes = `<!--INPUT:${JSON.stringify(var_input)}-->${cloned.mes}`
+                }
+                new_chat.push(cloned);
+            }
+            chat.length = 0;
+            chat.push(...new_chat);
         }
     }
 }
