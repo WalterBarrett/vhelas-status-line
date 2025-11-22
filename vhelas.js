@@ -46,6 +46,21 @@ function onButtonClick() {
 }
 */
 
+function fnv1a_64(str) {
+    const fnvPrime = 0x100000001b3n;
+    let hash = 0xcbf29ce484222325n;
+
+    const encoder = new TextEncoder(); // UTF-8
+    const bytes = encoder.encode(str);
+
+    for (const byte of bytes) {
+        hash ^= BigInt(byte);
+        hash = (hash * fnvPrime) & ((1n << 64n) - 1n); // mod 2^64
+    }
+
+    return hash.toString();
+}
+
 function getTextForValue(value) {
     if (value === null) {
         return "";
@@ -67,7 +82,6 @@ function getSaveData() {
     for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i];
         const swipe_id = msg.swipe_id || 0;
-        console.log(`[Vhelas] msg, msg.variables[${swipe_id}]:`, msg, msg.variables[swipe_id])
         if (!("vhelas_save" in msg.variables[swipe_id])) {
             continue;
         }
@@ -237,7 +251,6 @@ function parseSingleMessageForVhelasTags(msg_text) {
 function parseAllMessagesForVhelasTags() {
     const context = getContext();
     let anythingModified = false;
-    console.log(`[Vhelas] context.chat:`, context.chat);
     for (let i = 0; i < context.chat.length; i++) {
         const msg = context.chat[i];
         if ("swipes" in msg) {
@@ -322,18 +335,42 @@ jQuery(async () => {
     window.addEventListener('resize', updateStatusBarMetrics);
 });
 
-/* We're at load order 3008, so we'll (hopefully) load after anything that cares about contextSize,
-   since the save file would bloat the token size infinitely, if it was actually sent to a real LLM
-   instead of our IF interpreter. */
 globalThis.vhelasInterceptor = async function(chat, contextSize, abort, type) {
     let save_data = getSaveData();
     if (save_data) {
-        const systemNote = {
-            is_user: false,
-            name: "Vhelas",
-            send_date: Date.now(),
-            mes: `<!--SAVE:"${save_data}"-->`
-        };
-        chat.unshift(systemNote);
+        const context = getContext();
+        const ccs = context.chatCompletionSettings;
+        if (ccs.chat_completion_source !== "custom") {
+            console.error(`[Vhelas] Chat Completion Source is "${ccs.chat_completion_source}", not "custom". Aborting.`);
+            return;
+        }
+        if (save_data) {
+            let hash = fnv1a_64(save_data)
+            try {
+                const endpoint = `${ccs.custom_url}/save`;
+                let sent_data = {
+                    "hash": hash,
+                    "save_data": save_data
+                }
+                console.log(`[Vhelas] Sending save data to ${endpoint}:`, sent_data);
+
+                await fetch(endpoint, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(sent_data)
+                });
+            } catch (err) {
+                console.error("[Vhelas] Failed to POST save data:", err);
+            }
+            const systemNote = {
+                is_user: false,
+                name: "Vhelas",
+                send_date: Date.now(),
+                mes: `<!--SAVE:"${hash}"-->`
+            };
+            chat.unshift(systemNote);
+        }
     }
 }
