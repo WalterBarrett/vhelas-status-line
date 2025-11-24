@@ -234,6 +234,10 @@ function parseSingleMessageForVhelasTags(msg_text) {
                 (Array.isArray(parsed) && parsed.every(el => typeof el === "string" || typeof el === "number" || el === null)
             ),
             assign: (parsed) => ({ vhelas_input: parsed })
+        },
+        GAME: {
+            validate: (parsed) => typeof parsed === "string",
+            assign: (parsed) => ({ vhelas_game: parsed })
         }
     };
 
@@ -391,6 +395,10 @@ globalThis.vhelasInterceptor = async function(chat, contextSize, abort, type) {
                 const var_input = getVariableFromMessage(msg, "input");
                 if (var_input !== undefined) {
                     cloned.mes = `<!--INPUT:${JSON.stringify(var_input)}-->${cloned.mes}`
+                }
+                const var_game = getVariableFromMessage(msg, "game");
+                if (var_game !== undefined) {
+                    cloned.mes = `<!--GAME:${JSON.stringify(var_game)}-->${cloned.mes}`
                 }
                 new_chat.push(cloned);
             }
