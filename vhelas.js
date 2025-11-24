@@ -211,6 +211,10 @@ function onNthMessageUpdate() {
 function parseSingleMessageForVhelasTags(msg_text) {
     let results = {};
 
+    if (!msg_text.includes("<!--")) {
+        return results;
+    }
+
     const tagHandlers = {
         STATUS: {
             validate: (parsed) =>
