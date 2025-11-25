@@ -76,7 +76,7 @@ function hasKeys(obj) {
 }
 
 function getVariableFromMessage(msg, variable) {
-    return msg.variables[msg.swipe_id]?.[`vhelas_${variable}`] ?? undefined;
+    return msg.variables[msg.swipe_id || 0][`vhelas_${variable}`] ?? undefined;
 }
 
 function getSaveData() {
@@ -99,6 +99,26 @@ function getSaveData() {
     }
 
     return null;
+}
+
+function hasGame() {
+    const context = getContext();
+    const messages = context.chat;
+    for (let i = 0; i < messages.length; i++) {
+        if (getVariableFromMessage(messages[i], "game")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function clearTags(obj, prefix) {
+    for (const key in obj) {
+        if (key.startsWith(prefix)) {
+            delete obj[key];
+        }
+    }
 }
 
 function updateStatusBar() {
@@ -238,6 +258,10 @@ function parseSingleMessageForVhelasTags(msg_text) {
         GAME: {
             validate: (parsed) => typeof parsed === "string",
             assign: (parsed) => ({ vhelas_game: parsed })
+        },
+        GAMESTART: {
+            validate: (parsed) => typeof parsed === "boolean",
+            assign: (parsed) => ({ vhelas_gamestart: parsed })
         }
     };
 
@@ -272,30 +296,35 @@ function parseAllMessagesForVhelasTags() {
     let anythingModified = false;
     for (let i = 0; i < context.chat.length; i++) {
         const msg = context.chat[i];
+        if (msg.is_user) {
+            clearTags(msg.variables[0], "vhelas_")
+        }
         if ("swipes" in msg) {
             for (let j = 0; j < msg.swipes.length; j++) {
-                let results = parseSingleMessageForVhelasTags(msg.swipes[j])
-                if ("mes" in results) {
-                    msg.swipes[j] = results["mes"];
-                    if (j == msg.swipe_id) {
-                        msg.mes = msg.swipes[j];
-                    }
-                    delete results.mes;
-                    anythingModified = true;
-                }
+                const results = parseSingleMessageForVhelasTags(msg.swipes[j])
                 if (hasKeys(results)) {
+                    clearTags(msg.variables[j], "vhelas_")
+                    if ("mes" in results) {
+                        msg.swipes[j] = results["mes"];
+                        if (j == msg.swipe_id) {
+                            msg.mes = msg.swipes[j];
+                        }
+                        delete results.mes;
+                        anythingModified = true;
+                    }
                     Object.assign(msg.variables[j], results);
                     anythingModified = true;
                 }
             }
         } else {
-            let results = parseSingleMessageForVhelasTags(msg.mes)
-            if ("mes" in results) {
-                msg.mes = results["mes"];
-                delete results.mes;
-                anythingModified = true;
-            }
+            const results = parseSingleMessageForVhelasTags(msg.mes)
             if (hasKeys(results)) {
+                clearTags(msg.variables[0], "vhelas_")
+                if ("mes" in results) {
+                    msg.mes = results["mes"];
+                    delete results.mes;
+                    anythingModified = true;
+                }
                 Object.assign(msg.variables[0], results);
                 anythingModified = true;
             }
@@ -355,14 +384,17 @@ jQuery(async () => {
 });
 
 globalThis.vhelasInterceptor = async function(chat, contextSize, abort, type) {
-    let save_data = getSaveData();
-    if (save_data) {
+    if (hasGame()) {
+        console.log(`[Vhelas] Has game.`);
         const context = getContext();
         const ccs = context.chatCompletionSettings;
         if (ccs.chat_completion_source !== "custom") {
             console.error(`[Vhelas] Chat Completion Source is "${ccs.chat_completion_source}", not "custom". Aborting.`);
+            abort();
             return;
         }
+        let save_data = getSaveData();
+        let new_chat = []
         if (save_data) {
             let hash = fnv1a_64(save_data)
             try {
@@ -384,26 +416,36 @@ globalThis.vhelasInterceptor = async function(chat, contextSize, abort, type) {
             } catch (err) {
                 console.error("[Vhelas] Failed to POST save data:", err);
             }
-            const new_chat = [{
+            new_chat.push({
                 is_user: false,
                 name: "Vhelas",
                 send_date: Date.now(),
                 mes: `<!--SAVE:${JSON.stringify(hash)}-->`
-            }]
-            for (const msg of chat) {
-                const cloned = structuredClone(msg);
-                const var_input = getVariableFromMessage(msg, "input");
-                if (var_input !== undefined) {
-                    cloned.mes = `<!--INPUT:${JSON.stringify(var_input)}-->${cloned.mes}`
-                }
-                const var_game = getVariableFromMessage(msg, "game");
-                if (var_game !== undefined) {
-                    cloned.mes = `<!--GAME:${JSON.stringify(var_game)}-->${cloned.mes}`
-                }
-                new_chat.push(cloned);
-            }
-            chat.length = 0;
-            chat.push(...new_chat);
+            })
         }
+        for (const msg of chat) {
+            const cloned = structuredClone(msg);
+
+            const var_input = getVariableFromMessage(msg, "input");
+            if (var_input !== undefined) {
+                cloned.mes = `<!--INPUT:${JSON.stringify(var_input)}-->${cloned.mes}`
+            }
+
+            const var_game = getVariableFromMessage(msg, "game");
+            if (var_game !== undefined) {
+                cloned.mes = `<!--GAME:${JSON.stringify(var_game)}-->${cloned.mes}`
+            }
+
+            const var_gamestart = getVariableFromMessage(msg, "gamestart");
+            if (var_gamestart !== undefined) {
+                cloned.mes = `<!--GAMESTART:${JSON.stringify(var_gamestart)}-->${cloned.mes}`
+            }
+
+            new_chat.push(cloned);
+        }
+        chat.length = 0;
+        chat.push(...new_chat);
+    } else {
+        console.log(`[Vhelas] No game.`);
     }
 }
