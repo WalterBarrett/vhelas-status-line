@@ -1,50 +1,181 @@
-// The main script for the extension
-// The following are examples of some basic extension functionality
+import { extension_settings, getContext } from "../../../extensions.js";
 
-//You'll likely need to import extension_settings, getContext, and loadExtensionSettings from extensions.js
-import { extension_settings, getContext, loadExtensionSettings } from "../../../extensions.js";
-
-//You'll likely need to import some other functions from the main script
 import { saveSettingsDebounced, saveChatConditional } from "../../../../script.js";
 
 // Keep track of where your extension is located, name should match repo name
 const extensionName = "vhelas-status-line";
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
-const extensionSettings = extension_settings[extensionName];
-const defaultSettings = {};
 
+const settings_registry = {
+    "enabled": {
+        "name": "Enabled",
+        "type": "checkbox",
+        "default": true,
+    },
+    "parser_augmentation": {
+        "name": "Parser Augmentation",
+        "description": "The type of parser augmentation to use.",
+        "type": "radio",
+        "default": "rules",
+        "values": {
+            "disabled": {
+                "title": "Disabled",
+                "description": "Passes the raw user input along.",
+            },
+            "rules": {
+                "title": "Rules-Based",
+                "description": "Handles <i>incredibly</i> simple cases like converting \"I take the card.\" to \"take the card\". Incredibly fast but <i>incredibly</i> limited.",
+            },
+            "nlp": {
+                "title": "Use Natural Language Processing",
+                "description": "Handles simple cases like converting \"I take the card.\" to \"take card\". Theoretically faster.",
+            },
+            "llm": {
+                "title": "Use Large Language Model",
+                "description": "Handles complex cases like converting \"I swiftly slide the metallic-looking rectangle into my pocket.\" to \"take card\". Theoretically slower.",
+            },
+        }
+    },
+    "output_augmentation": {
+        "name": "Output Augmentation",
+        "description": "The type of output augmentation to use.",
+        "type": "radio",
+        "default": "disabled",
+        "values": {
+            "disabled": {
+                "title": "Disabled",
+                "description": "Returns the raw text from the interpreter.",
+            },
+            "rewrite": {
+                "title": "Large Language Model-based Rewrite",
+                "description": "Uses an LLM to rewrite the output, without any mechanism to modify worldstate.",
+            },
+            "worldstatemodification": {
+                "title": "Large Language Model-based world-state modification",
+                "description": "Uses an LLM to rewrite the output, and attempts to allow the LLM to modify worldstate by sending commands behind-the-scenes.",
+            },
+        }
+    },
+    /*
+    "test_button": {
+        "name": "Test Button",
+        "description": "Pops up a test toast.",
+        "type": "button",
+        "proc": () => toastr.info("Test message body.", "Test Title"),
+    },
+    "test_line": {
+        "name": "Test Line of Text",
+        "type": "text",
+        "default": "Line of text.",
+    },
+    "test_textarea": {
+        "name": "Test Paragraph of Text",
+        "type": "textarea",
+        "default": "A paragraph of text!\n\nThe text keeps coming and it don't stop coming!",
+    },
+    "test_code": {
+        "name": "Test Block of Code",
+        "type": "code",
+        "default": "{\n    \"test\": \"Test.\"\n}\n",
+    },
+    */
+};
 
-
-// Loads the extension settings if they exist, otherwise initializes them to the defaults.
-async function loadSettings() {
-    //Create the settings if they don't exist
-    extension_settings[extensionName] = extension_settings[extensionName] || {};
-    if (Object.keys(extension_settings[extensionName]).length === 0) {
-        Object.assign(extension_settings[extensionName], defaultSettings);
-    }
-
-    // Updating settings in the UI
-    //$("#example_setting").prop("checked", extension_settings[extensionName].example_setting).trigger("input");
+function getSetting(key) {
+    let value = extension_settings[extensionName][key];
+    if (value != undefined) { return value; }
+    return settings_registry[key].default;
 }
 
-// This function is called when the extension settings are changed in the UI
-function onExampleInput(event) {
-    const value = Boolean($(event.target).prop("checked"));
-    extension_settings[extensionName].example_setting = value;
+function setSetting(key, value) {
+    let oldValue = extension_settings[extensionName][key];
+    if (oldValue == value) { return; }
+    extension_settings[extensionName][key] = value;
     saveSettingsDebounced();
 }
 
-/*
-// This function is called when the button is clicked
-function onButtonClick() {
-    // You can do whatever you want here
-    // Let's make a popup appear with the checked setting
-    toastr.info(
-        `The checkbox is ${extension_settings[extensionName].example_setting ? "checked" : "not checked"}`,
-        "A popup appeared because you clicked the button!"
-    );
+async function loadSettings() {
+    extension_settings[extensionName] = extension_settings[extensionName] || {};
+    const settings_drawer = $("#vhelas-settings-drawer");
+    for (const [key, setting] of Object.entries(settings_registry)) {
+        const inputId = `vhelas_setting_${key}`;
+        switch (setting.type) {
+            case "checkbox": {
+                const container = $("<div>").addClass("flex-container");
+                const input = $("<input>")
+                    .attr("id", inputId)
+                    .attr("type", "checkbox")
+                    .prop("checked", getSetting(key))
+                    .on("change", function () { setSetting(key, this.checked); });
+                const label = $("<label>").attr("for", inputId).text(setting.name);
+                container.append(input, label);
+                settings_drawer.append(container);
+                break;
+            }
+            case "radio": {
+                const header = $("<h4>").text(setting.name);
+                settings_drawer.append(header);
+                if (setting.description) {
+                    settings_drawer.append($("<div>").addClass("marginTopBot5").html(setting.description));
+                }
+                const currentValue = getSetting(key);
+                for (const [valKey, valDef] of Object.entries(setting.values)) {
+                    const valInputId = `vhelas_setting_${key}_${valKey}`;
+                    const label = $("<label>").attr("for", valInputId).addClass("checkbox_label");
+                    const input = $("<input>")
+                        .attr("id", valInputId)
+                        .attr("type", "radio")
+                        .attr("name", inputId)
+                        .attr("value", valKey)
+                        .prop("checked", currentValue === valKey)
+                        .on("change", function () { setSetting(key, this.value); });
+                    const span = $("<span>").html(`<b>${valDef.title}:</b> ${valDef.description || ""}`);
+                    label.append(input, span);
+                    settings_drawer.append(label);
+                }
+                break;
+            }
+            case "text": {
+                const label = $("<label>").attr("for", inputId).text(setting.name);
+                const input = $("<input>")
+                    .attr("id", inputId)
+                    .addClass("text_pole")
+                    .attr("placeholder", setting.default)
+                    .val(getSetting(key))
+                    .on("input", function () { setSetting(key, this.value); });
+                settings_drawer.append(label, input);
+                break;
+            }
+            case "textarea":
+            case "code": {
+                const label = $("<label>").attr("for", inputId).text(setting.name);
+                const textarea = $("<textarea>")
+                    .attr("id", inputId)
+                    .addClass("text_pole textarea_compact autoSetHeight")
+                    .attr("rows", 2)
+                    .attr("placeholder", setting.default)
+                    .val(getSetting(key))
+                    .on("input", function () { setSetting(key, this.value); });
+                if (setting.type == "code") {
+                    textarea.addClass("monospace");
+                }
+                settings_drawer.append(label, textarea);
+                break;
+            }
+            case "button": {
+                const button = $("<div>")
+                    .attr("id", inputId)
+                    .addClass("menu_button menu_button_icon interactable")
+                    .attr("title", setting.description || "")
+                    .attr("role", "button")
+                    .text(setting.name)
+                    .on("click", setting.proc);
+                settings_drawer.append(button);
+                break;
+            }
+        }
+    }
 }
-*/
 
 function fnv1a_64(str) {
     const fnvPrime = 0x100000001b3n;
@@ -365,17 +496,9 @@ jQuery(async () => {
     // Append settingsHtml to extensions_settings
     // extension_settings and extensions_settings2 are the left and right columns of the settings menu
     // Left should be extensions that deal with system functions and right should be visual/UI related
-    $("#extensions_settings2").append(settingsHtml);
-
+    $("#extensions_settings").append(settingsHtml);
     $("#top-settings-holder").after(statuslineHtml);
 
-    /*
-    // These are examples of listening for events
-    $("#my_button").on("click", onButtonClick);
-    $("#example_setting").on("input", onExampleInput);
-    */
-
-    // Load settings when starting things up (if you have any)
     loadSettings();
 
     updateStatusBar();
@@ -384,7 +507,7 @@ jQuery(async () => {
 });
 
 globalThis.vhelasInterceptor = async function(chat, contextSize, abort, type) {
-    if (hasGame()) {
+    if (getSetting("enabled") && hasGame()) {
         console.log(`[Vhelas] Has game.`);
         const context = getContext();
         const ccs = context.chatCompletionSettings;
@@ -445,7 +568,5 @@ globalThis.vhelasInterceptor = async function(chat, contextSize, abort, type) {
         }
         chat.length = 0;
         chat.push(...new_chat);
-    } else {
-        console.log(`[Vhelas] No game.`);
     }
 }
