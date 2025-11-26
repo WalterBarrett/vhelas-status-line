@@ -506,6 +506,34 @@ jQuery(async () => {
     window.addEventListener('resize', updateStatusBarMetrics);
 });
 
+async function postData(name, data) {
+    const ccs = getContext().chatCompletionSettings;
+    if (typeof data != "string") {
+        data = JSON.stringify(data);
+    }
+    let hash = fnv1a_64(data)
+    try {
+        const endpoint = `${ccs.custom_url}/vhelas/${name}`;
+        let sent_data = {
+            "hash": hash,
+            "data": data,
+        }
+        //console.log(`[Vhelas] Sending ${name} data to ${endpoint}:`, sent_data);
+        console.log(`[Vhelas] Sending ${name} data to ${endpoint}.`);
+
+        await fetch(endpoint, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(sent_data)
+        });
+    } catch (err) {
+        console.error(`[Vhelas] Failed to POST ${name} data:`, err);
+    }
+    return hash;
+}
+
 globalThis.vhelasInterceptor = async function(chat, contextSize, abort, type) {
     if (getSetting("enabled") && hasGame()) {
         console.log(`[Vhelas] Has game.`);
@@ -516,56 +544,62 @@ globalThis.vhelasInterceptor = async function(chat, contextSize, abort, type) {
             abort();
             return;
         }
-        let save_data = getSaveData();
         let new_chat = []
-        if (save_data) {
-            let hash = fnv1a_64(save_data)
-            try {
-                const endpoint = `${ccs.custom_url}/save`;
-                let sent_data = {
-                    "hash": hash,
-                    "save_data": save_data
-                }
-                //console.log(`[Vhelas] Sending save data to ${endpoint}:`, sent_data);
-                console.log(`[Vhelas] Sending save data to ${endpoint}.`);
-
-                await fetch(endpoint, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(sent_data)
-                });
-            } catch (err) {
-                console.error("[Vhelas] Failed to POST save data:", err);
-            }
-            new_chat.push({
-                is_user: false,
-                name: "Vhelas",
-                send_date: Date.now(),
-                mes: `<!--SAVE:${JSON.stringify(hash)}-->`
-            })
-        }
+        const data = {
+            "game": null,
+        };
+        let inputs = [];
+        let saveData = null;
+        let gameStart = false;
         for (const msg of chat) {
             const cloned = structuredClone(msg);
 
             const var_input = getVariableFromMessage(msg, "input");
             if (var_input !== undefined) {
-                cloned.mes = `<!--INPUT:${JSON.stringify(var_input)}-->${cloned.mes}`
+                if (Array.isArray(var_input)) {
+                    inputs.push(...var_input);
+                } else {
+                    inputs.push(var_input);
+                }
             }
 
             const var_game = getVariableFromMessage(msg, "game");
             if (var_game !== undefined) {
-                cloned.mes = `<!--GAME:${JSON.stringify(var_game)}-->${cloned.mes}`
+                data.game = var_game;
             }
 
             const var_gamestart = getVariableFromMessage(msg, "gamestart");
             if (var_gamestart !== undefined) {
-                cloned.mes = `<!--GAMESTART:${JSON.stringify(var_gamestart)}-->${cloned.mes}`
+                gameStart = var_gamestart;
+            }
+
+            const var_save = getVariableFromMessage(msg, "save");
+            if (var_save !== undefined) {
+                saveData = var_save;
             }
 
             new_chat.push(cloned);
         }
+
+        if (!gameStart) {
+            inputs = null;
+        }
+
+        if (saveData) {
+            data.save = await postData("save", saveData);
+        }
+
+        if (inputs) {
+            data.inputs = await postData("input", inputs);
+        }
+
+        new_chat.unshift({
+            is_user: false,
+            name: "Vhelas",
+            send_date: Date.now(),
+            mes: `<!--DATA:${JSON.stringify(data)}-->`
+        })
+
         chat.length = 0;
         chat.push(...new_chat);
     }
