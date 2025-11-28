@@ -1,6 +1,10 @@
 /* All style elements for your extension go here */
 :root {
     --statusBarHeight: 22px;
+    --vhelas-card-main-background: color-mix(in srgb, var(--SmartThemeChatTintColor) 70%, var(--SmartThemeBorderColor));
+    --vhelas-card-main-foreground: var(--SmartThemeBodyColor);
+    --vhelas-card-accent-background: var(--SmartThemeBorderColor);
+    --vhelas-card-accent-foreground: var(--SmartThemeEmColor);
 }
 
 #chat {
@@ -55,4 +59,70 @@
     width: 100vw;
     width: 100dvw;
   }
+}
+
+.vhelas-card-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    place-items: center;
+}
+
+.vhelas-card {
+    width: 400px;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 6px 6px;
+    background-color: var(--vhelas-card-main-background);
+    border: 1px solid var(--vhelas-card-accent-background);
+    border-top: 0px;
+    border-bottom: 0px;
+}
+
+.vhelas-card-header,
+.vhelas-card-footer {
+    text-align: center;
+    white-space: nowrap;
+    padding: 3.2px 12px;
+    background-color: var(--vhelas-card-accent-background);
+    color: var(--vhelas-card-accent-foreground)
+}
+
+.vhelas-card-header {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: bold;
+}
+
+.vhelas-card-footer {
+    overflow: auto hidden;
+}
+
+.vhelas-card-body {
+    display: flex;
+}
+
+.vhelas-card-body img {
+    width: 185px;
+    height: 185px;
+    border-radius: 4px;
+    margin-right: 10px;
+    object-fit: contain;
+}
+
+.vhelas-card-description {
+    flex: 1;
+    height: 185px;
+    font-size: 0.8rem;
+    overflow: scroll;
+    padding: 0px 12px;
+    text-align: left;
+    color:var(--vhelas-card-main-foreground);
+}
+
+.vhelas-card-description p:first-child {
+    margin-top: 0;
+}
+
+.vhelas-card-description p:last-child {
+    margin-bottom: 0;
 }

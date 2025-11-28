@@ -1,6 +1,5 @@
 import { extension_settings, getContext } from "../../../extensions.js";
-
-import { saveSettingsDebounced, saveChatConditional } from "../../../../script.js";
+import { processDroppedFiles, saveChatConditional, saveSettingsDebounced } from "../../../../script.js";
 
 // Keep track of where your extension is located, name should match repo name
 const extensionName = "vhelas-status-line";
@@ -499,6 +498,13 @@ jQuery(async () => {
     $("#extensions_settings").append(settingsHtml);
     $("#top-settings-holder").after(statuslineHtml);
 
+    const addGameButton = $("<div>")
+        .attr("id", "vhelas-add-game")
+        .addClass("menu_button fa-solid fa-address-book interactable")
+        .attr("role", "button")
+        .on("click", openGameList);
+    $("#character_sort_order").before(addGameButton);
+
     loadSettings();
 
     updateStatusBar();
@@ -602,5 +608,56 @@ globalThis.vhelasInterceptor = async function(chat, contextSize, abort, type) {
 
         chat.length = 0;
         chat.push(...new_chat);
+    }
+}
+
+async function downloadGameCharacterCard(game) {
+    const context = getContext();
+    const endpoint = `${context.chatCompletionSettings.custom_url}/vhelas/games/${game}`;
+    try {
+        processDroppedFiles([new File([await (await fetch(endpoint, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+            }
+        })).blob()], `${game}.json`, { type: "application/json" })]);
+    } catch (err) {
+        console.error(`[Vhelas] Failed to GET ${endpoint}:`, err);
+    }
+}
+
+async function openGameList() {
+    const context = getContext();
+    const endpoint = `${context.chatCompletionSettings.custom_url}/vhelas/games`;
+    try {
+        const data = await (await fetch(endpoint, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+            }
+        })).json();
+        const card_container = $("<div>").addClass("vhelas-card-container");
+        Object.entries(data).forEach(([key, game]) => {
+            const card = $("<div>").addClass("vhelas-card");
+            const card_header = $("<div>").addClass("vhelas-card-header").appendTo(card);
+            $("<a>").text(game.name).attr("title", game.name).attr("href", "#").on("click", () => downloadGameCharacterCard(key)).appendTo(card_header);
+            const card_body = $("<div>").addClass("vhelas-card-body").appendTo(card);
+            if (game.cover) {
+                $("<img>").attr("src", game.cover).attr("alt", game.name + " cover").appendTo(card_body);
+            }
+            const card_description = $("<div>").addClass("vhelas-card-description").appendTo(card_body);
+            $("<p>").text(game.description).appendTo(card_description);
+            $("<div>").addClass("vhelas-card-footer").text(game.author).appendTo(card);
+            card.appendTo(card_container);
+        });
+        context.callGenericPopup(card_container, context.POPUP_TYPE.TEXT, '', {
+            wide: true,
+            large: true,
+            allowVerticalScrolling: true,
+            allowHorizontalScrolling: false,
+            transparent: false,
+        });
+    } catch (err) {
+        console.error(`[Vhelas] Failed to GET ${endpoint}:`, err);
     }
 }
