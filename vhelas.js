@@ -209,28 +209,6 @@ function getVariableFromMessage(msg, variable) {
     return msg.variables[msg.swipe_id || 0][`vhelas_${variable}`] ?? undefined;
 }
 
-function getSaveData() {
-    const context = getContext();
-    const messages = context.chat;
-
-    for (let i = messages.length - 1; i >= 0; i--) {
-        const msg = messages[i];
-        const swipe_id = msg.swipe_id || 0;
-        if (!("vhelas_save" in msg.variables[swipe_id])) {
-            continue;
-        }
-
-        const save_string = msg.variables[swipe_id].vhelas_save;
-        if (!(typeof save_string === "string" || save_string === null)) {
-            console.error("[Vhelas] Expected JSON string for SAVE update:", save_string);
-            continue;
-        }
-		return save_string;
-    }
-
-    return null;
-}
-
 function hasGame() {
     const context = getContext();
     const messages = context.chat;
@@ -347,7 +325,7 @@ function onCharacterUpdate() {
 }
 
 function onMostRecentMessageUpdate() {
-    // Theoretically, we couold quickly update the status bar based off just this single message, if applicable.
+    // Theoretically, we could quickly update the status bar based off just this single message, if applicable.
     // For now, we'll just hope this is fast enough:
     onNthMessageUpdate();
 }
