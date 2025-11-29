@@ -531,6 +531,8 @@ globalThis.vhelasInterceptor = async function(chat, contextSize, abort, type) {
         let new_chat = []
         const data = {
             "game": null,
+            "parser_aug": getSetting("parser_augmentation"),
+            "output_aug": getSetting("output_augmentation"),
         };
         let inputs = [];
         let saveData = null;
