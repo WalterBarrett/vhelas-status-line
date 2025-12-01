@@ -71,11 +71,19 @@ const settings_registry = {
         "name": "Test Paragraph of Text",
         "type": "textarea",
         "default": "A paragraph of text!\n\nThe text keeps coming and it don't stop coming!",
+        "description": "An example text area.",
     },
     "test_code": {
         "name": "Test Block of Code",
         "type": "code",
         "default": "{\n    \"test\": \"Test.\"\n}\n",
+        "description": "An example code block.",
+    },
+    "test_secret": {
+        "name": "Test Secret",
+        "type": "secret",
+        "placeholder": "The most secret text.",
+        "description": "An example secret.",
     },
     */
 };
@@ -98,6 +106,8 @@ async function loadSettings() {
     const settings_drawer = $("#vhelas-settings-drawer");
     for (const [key, setting] of Object.entries(settings_registry)) {
         const inputId = `vhelas_setting_${key}`;
+        const placeholder = setting.placeholder || setting.default;
+        const description = setting.description || "";
         switch (setting.type) {
             case "checkbox": {
                 const container = $("<div>").addClass("flex-container");
@@ -114,8 +124,8 @@ async function loadSettings() {
             case "radio": {
                 const header = $("<h4>").text(setting.name);
                 settings_drawer.append(header);
-                if (setting.description) {
-                    settings_drawer.append($("<div>").addClass("marginTopBot5").html(setting.description));
+                if (description) {
+                    settings_drawer.append($("<div>").addClass("marginTopBot5").html(description));
                 }
                 const currentValue = getSetting(key);
                 for (const [valKey, valDef] of Object.entries(setting.values)) {
@@ -134,38 +144,60 @@ async function loadSettings() {
                 }
                 break;
             }
-            case "text": {
-                const label = $("<label>").attr("for", inputId).text(setting.name);
+            case "text":
+            case "secret": {
+                if (!description) {
+                    const label = $("<label>").attr("for", inputId);
+                    $("<h4>").text(setting.name).appendTo(label);
+                    label.appendTo(settings_drawer);
+                } else {
+                    $("<h4>").text(setting.name).appendTo(settings_drawer);
+                    $("<div>").addClass("marginTopBot5").html(description).appendTo(settings_drawer);
+                }
                 const input = $("<input>")
                     .attr("id", inputId)
                     .addClass("text_pole")
-                    .attr("placeholder", setting.default)
+                    .attr("placeholder", placeholder)
                     .val(getSetting(key))
-                    .on("input", function () { setSetting(key, this.value); });
-                settings_drawer.append(label, input);
+                    .on("input", function () { setSetting(key, this.value); })
+                    .appendTo(settings_drawer);
+                if (setting.type == "secret") {
+                    input.attr("type", "password");
+                    input.attr("autocomplete", "off");
+                    input.attr("spellcheck", "false");
+                    input.attr("data-lpignore", "true");
+                    input.attr("data-1p-ignore", "true");
+                }
                 break;
             }
             case "textarea":
             case "code": {
-                const label = $("<label>").attr("for", inputId).text(setting.name);
+                if (!description) {
+                    const label = $("<label>").attr("for", inputId);
+                    $("<h4>").text(setting.name).appendTo(label);
+                    label.appendTo(settings_drawer);
+                } else {
+                    $("<h4>").text(setting.name).appendTo(settings_drawer);
+                    $("<div>").addClass("marginTopBot5").html(description).appendTo(settings_drawer);
+                }
                 const textarea = $("<textarea>")
                     .attr("id", inputId)
                     .addClass("text_pole textarea_compact autoSetHeight")
                     .attr("rows", 2)
-                    .attr("placeholder", setting.default)
+                    .attr("placeholder", placeholder)
                     .val(getSetting(key))
                     .on("input", function () { setSetting(key, this.value); });
                 if (setting.type == "code") {
                     textarea.addClass("monospace");
                 }
-                settings_drawer.append(label, textarea);
+                settings_drawer.append(textarea);
                 break;
             }
             case "button": {
                 const button = $("<div>")
                     .attr("id", inputId)
                     .addClass("menu_button menu_button_icon interactable")
-                    .attr("title", setting.description || "")
+                    .attr("title", description)
                     .attr("role", "button")
                     .text(setting.name)
                     .on("click", setting.proc);
