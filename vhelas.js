@@ -55,6 +55,13 @@ const settings_registry = {
             },
         }
     },
+    "api_key": {
+        "name": "API Key",
+        "type": "secret",
+        "default": "",
+        "placeholder": "Vhelas API Key",
+        "description": "API Key to send to custom Vhelas endpoints.",
+    },
     /*
     "test_button": {
         "name": "Test Button",
@@ -527,21 +534,28 @@ async function postData(name, data) {
     if (typeof data != "string") {
         data = JSON.stringify(data);
     }
-    let hash = fnv1a_64(data)
+    let hash = fnv1a_64(data);
     try {
         const endpoint = `${ccs.custom_url}/vhelas/${name}`;
         let sent_data = {
             "hash": hash,
             "data": data,
-        }
+        };
         //console.log(`[Vhelas] Sending ${name} data to ${endpoint}:`, sent_data);
         console.log(`[Vhelas] Sending ${name} data to ${endpoint}.`);
 
+        const headers = {
+            "Content-Type": "application/json",
+        };
+
+        const apiKey = getSetting("api_key");
+        if (apiKey) {
+            headers["Authorization"] = `Bearer ${apiKey}`;
+        }
+
         await fetch(endpoint, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: headers,
             body: JSON.stringify(sent_data)
         });
     } catch (err) {
