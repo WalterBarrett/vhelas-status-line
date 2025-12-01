@@ -529,6 +529,22 @@ jQuery(async () => {
     window.addEventListener('resize', updateStatusBarMetrics);
 });
 
+function getHeaders(isJson = true) {
+    const headers = {
+    };
+
+    if (isJson) {
+        headers["Content-Type"] = "application/json";
+    }
+
+    const apiKey = getSetting("api_key");
+    if (apiKey) {
+        headers["Authorization"] = `Bearer ${apiKey}`;
+    }
+
+    return headers;
+}
+
 async function postData(name, data) {
     const ccs = getContext().chatCompletionSettings;
     if (typeof data != "string") {
@@ -544,18 +560,9 @@ async function postData(name, data) {
         //console.log(`[Vhelas] Sending ${name} data to ${endpoint}:`, sent_data);
         console.log(`[Vhelas] Sending ${name} data to ${endpoint}.`);
 
-        const headers = {
-            "Content-Type": "application/json",
-        };
-
-        const apiKey = getSetting("api_key");
-        if (apiKey) {
-            headers["Authorization"] = `Bearer ${apiKey}`;
-        }
-
         await fetch(endpoint, {
             method: "POST",
-            headers: headers,
+            headers: getHeaders(),
             body: JSON.stringify(sent_data)
         });
     } catch (err) {
@@ -643,9 +650,7 @@ async function downloadGameCharacterCard(game) {
     try {
         processDroppedFiles([new File([await (await fetch(endpoint, {
             method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-            }
+            headers: getHeaders(),
         })).blob()], `${game}.json`, { type: "application/json" })]);
     } catch (err) {
         console.error(`[Vhelas] Failed to GET ${endpoint}:`, err);
@@ -658,9 +663,7 @@ async function openGameList() {
     try {
         const data = await (await fetch(endpoint, {
             method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-            }
+            headers: getHeaders(),
         })).json();
         const card_container = $("<div>").addClass("vhelas-card-container");
         Object.entries(data).forEach(([key, game]) => {
