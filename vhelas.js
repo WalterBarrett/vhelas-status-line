@@ -654,10 +654,18 @@ async function downloadGameCharacterCard(game) {
     const context = getContext();
     const endpoint = `${context.chatCompletionSettings.custom_url}/vhelas/games/${game}`;
     try {
-        processDroppedFiles([new File([await (await fetch(endpoint, {
+        const fetched = await fetch(endpoint, {
             method: "GET",
             headers: getHeaders(),
-        })).blob()], `${game}.json`, { type: "application/json" })]);
+        });
+        const mimeType = fetched.headers.get("content-type");
+        if (mimeType == "image/png") {
+            processDroppedFiles([new File([await (fetched.blob())], `${game}.png`, { type: "image/png" })]);
+        } else if (mimeType == "application/json") {
+            processDroppedFiles([new File([await (fetched.blob())], `${game}.json`, { type: "application/json" })]);
+        } else {
+            console.error(`[Vhelas] ${endpoint} has invalid MIME type: \"${mimeType}\".`);
+        }
     } catch (err) {
         console.error(`[Vhelas] Failed to GET ${endpoint}:`, err);
     }
