@@ -674,8 +674,7 @@ async function openGameList() {
             if (game.cover) {
                 $("<img>").attr("src", game.cover).attr("alt", game.name + " cover").appendTo(card_body);
             }
-            const card_description = $("<div>").addClass("vhelas-card-description").appendTo(card_body);
-            $("<p>").text(game.description).appendTo(card_description);
+            $("<div>").addClass("vhelas-card-description").html(game.description).appendTo(card_body);
             $("<div>").addClass("vhelas-card-footer").text(game.author).appendTo(card);
             card.appendTo(card_container);
         });
