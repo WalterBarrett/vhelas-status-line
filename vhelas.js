@@ -679,7 +679,7 @@ async function openGameList() {
             $("<a>").text(game_name).attr("title", game_name).attr("href", "#").on("click", () => downloadGameCharacterCard(key)).appendTo(card_header);
             const card_body = $("<div>").addClass("vhelas-card-body").appendTo(card);
             if (game.cover) {
-                $("<img>").attr("src", game.cover).attr("alt", game_name + " cover").appendTo(card_body);
+                $("<img>").attr("src", `${endpoint}/${key}/cover`).attr("alt", game_name + " cover").appendTo(card_body);
             }
             $("<div>").addClass("vhelas-card-description").html(game.description).appendTo(card_body);
             $("<div>").addClass("vhelas-card-footer").text(game.author).appendTo(card);
