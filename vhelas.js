@@ -1,5 +1,7 @@
 import { extension_settings, getContext } from "../../../extensions.js";
 import { processDroppedFiles, saveChatConditional, saveSettingsDebounced } from "../../../../script.js";
+import { getUserAvatar, user_avatar } from '../../../personas.js';
+import { power_user } from '../../../power-user.js';
 
 // Keep track of where your extension is located, name should match repo name
 const extensionName = "vhelas-status-line";
@@ -266,6 +268,10 @@ function clearTags(obj, prefix) {
             delete obj[key];
         }
     }
+}
+
+function getPersona() {
+    return power_user.personas[user_avatar];
 }
 
 function updateStatusBar() {
@@ -669,10 +675,11 @@ async function openGameList() {
         Object.entries(data).forEach(([key, game]) => {
             const card = $("<div>").addClass("vhelas-card");
             const card_header = $("<div>").addClass("vhelas-card-header").appendTo(card);
-            $("<a>").text(game.name).attr("title", game.name).attr("href", "#").on("click", () => downloadGameCharacterCard(key)).appendTo(card_header);
+            let game_name = game.name.replace("{{user}}", getPersona());
+            $("<a>").text(game_name).attr("title", game_name).attr("href", "#").on("click", () => downloadGameCharacterCard(key)).appendTo(card_header);
             const card_body = $("<div>").addClass("vhelas-card-body").appendTo(card);
             if (game.cover) {
-                $("<img>").attr("src", game.cover).attr("alt", game.name + " cover").appendTo(card_body);
+                $("<img>").attr("src", game.cover).attr("alt", game_name + " cover").appendTo(card_body);
             }
             $("<div>").addClass("vhelas-card-description").html(game.description).appendTo(card_body);
             $("<div>").addClass("vhelas-card-footer").text(game.author).appendTo(card);
