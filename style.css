@@ -126,3 +126,15 @@
 .vhelas-card-description p:last-child {
     margin-bottom: 0;
 }
+
+@media screen and (max-width: 500px) {
+    .vhelas-card-body {
+        display: block
+    }
+    .vhelas-card-container {
+        grid-template-columns: 1fr;
+    }
+    .vhelas-card {
+        width: 100%;
+    }
+}
