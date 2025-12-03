@@ -247,7 +247,7 @@ function hasKeys(obj) {
 }
 
 function getVariableFromMessage(msg, variable) {
-    return msg.variables[msg.swipe_id || 0][`vhelas_${variable}`] ?? undefined;
+    return msg?.variables[msg.swipe_id || 0][`vhelas_${variable}`] ?? undefined;
 }
 
 function hasGame() {
