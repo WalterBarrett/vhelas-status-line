@@ -1,6 +1,6 @@
 import { extension_settings, getContext } from "../../../extensions.js";
 import { processDroppedFiles, saveChatConditional, saveSettingsDebounced } from "../../../../script.js";
-import { getUserAvatar, user_avatar } from '../../../personas.js';
+import { user_avatar } from '../../../personas.js';
 import { power_user } from '../../../power-user.js';
 
 // Keep track of where your extension is located, name should match repo name
