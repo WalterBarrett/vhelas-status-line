@@ -419,8 +419,7 @@ function parseSingleMessageForVhelasTags(msg_text) {
     };
 
     for (const [tagName, { validate, assign }] of Object.entries(tagHandlers)) {
-        const marker = `<!--${tagName}:`;
-        if (msg_text.includes(marker)) {
+        if (msg_text.includes("<!--") && msg_text.includes(`${tagName}:`)) {
             const regex = new RegExp(`<!--${tagName}:([\\s\\S]*?)-->`, "g");
             const matches = [...msg_text.matchAll(regex)];
             for (let j = matches.length - 1; j >= 0; j--) {
